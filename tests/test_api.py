@@ -1,12 +1,24 @@
 import unittest
 from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
-from api import app, extrair_fontes
+from api import app, extrair_fontes, exigir_sessao
+import tempfile
+from pathlib import Path
+import armazenamento as db
 
 
 class APIWeb(unittest.TestCase):
     def setUp(self):
+        self.pasta = tempfile.TemporaryDirectory()
+        self.patch_banco = patch.object(db, 'BANCO', Path(self.pasta.name) / 'teste.db')
+        self.patch_banco.start()
+        app.dependency_overrides[exigir_sessao] = lambda: None
         self.cliente = TestClient(app)
+
+    def tearDown(self):
+        app.dependency_overrides.clear()
+        self.patch_banco.stop()
+        self.pasta.cleanup()
 
     def test_chave_ausente_e_validacao(self):
         with patch('api.obter_chave', side_effect=ValueError('ausente')):

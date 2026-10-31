@@ -4,9 +4,9 @@ Assistente de projetos pelo terminal, com Gemini e um servidor MCP local. As fer
 
 ## Interface gráfica — React + FastAPI
 
-Interface escura com chat, sugestões, nova conversa, painel de atividades MCP, trechos e fontes do RAG. As atividades aparecem após a resposta completa; não há streaming nesta versão. O histórico fica só na memória da aba e é apagado ao recarregar ou iniciar nova conversa.
+Interface preta e verde neon, banners digitais, robô triste na marca e favicon, auxiliar Bit, chat e fontes RAG. Conversas são salvas no SQLite e aparecem na barra lateral. As atividades aparecem após a resposta completa; não há streaming nesta versão.
 
-Requisitos: Python 3.11+ e Node.js 20.19+ ou 22.12+ (recomendado Node 22 LTS). Mantenha sua chave no `.env` da raiz, nunca no frontend. Esta versão é local, sem autenticação nem publicação externa.
+Requisitos: Python 3.11+ e Node.js 20.19+ ou 22.12+ (recomendado Node 22 LTS). Mantenha sua chave no `.env` da raiz, nunca no frontend. Esta versão é local, com uma conta pessoal e autenticação por cookie de sessão, sem publicação externa.
 
 Atualize a cópia existente e inicie o backend no primeiro terminal:
 
@@ -30,17 +30,29 @@ Abra **http://localhost:5175** no navegador. Pare cada processo com Ctrl+C no re
 
 | Arquivo | Papel na versão gráfica |
 | --- | --- |
-| `frontend/src/App.tsx` | Chat, histórico da aba, atividade e fontes |
+| `frontend/src/App.tsx` | Chat, conversas salvas, perfil, atividade e fontes |
 | `frontend/src/style.css` | Tema escuro e layout responsivo |
 | `frontend/vite.config.ts` | Encaminha `/api` ao backend local na porta 8005 |
 | `api.py` | Recebe mensagens em `POST /api/chat` e devolve resposta, eventos e fontes |
 | `agente.py` | Ciclo compartilhado de chamadas de ferramentas da CLI e da interface |
 
-Fluxo: navegador → FastAPI → Gemini → cliente MCP → ferramenta RAG → Gemini → resposta com eventos e fontes no navegador. Cada consulta web abre e fecha sua própria sessão MCP. O histórico textual enviado pela aba mantém o contexto, sem misturar conversas de usuários. Não há histórico persistente ou upload de documentos: adicione textos na pasta `documentos/`.
+Fluxo: navegador → FastAPI → Gemini → cliente MCP → ferramenta RAG → Gemini → resposta com eventos e fontes no navegador. Cada consulta web abre e fecha sua própria sessão MCP. O backend recupera o histórico salvo e usa as últimas 40 mensagens como contexto; o histórico completo continua armazenado. Não há upload de documentos: adicione textos na pasta `documentos/`.
 
-O indicador “API configurada” confirma a presença da chave, não valida credenciais nem cotas. Se aparecer “Backend indisponível”, confira se o primeiro terminal continua executando. Erros de consulta aparecem no chat; detalhes ficam no terminal Python. A API permite até 40 mensagens anteriores e 2.000 caracteres na pergunta. Use “Nova conversa” ao atingir o limite.
+O indicador “API configurada” confirma a presença da chave, não valida credenciais nem cotas. Se aparecer “Backend indisponível”, confira se o primeiro terminal continua executando. Erros de consulta aparecem no chat; detalhes ficam no terminal Python. A pergunta aceita até 2.000 caracteres. Novas conversas não apagam as anteriores; selecione uma conversa na barra lateral para retomá-la.
 
 Verificação do frontend: `cd frontend` e `npm run build`. Verificações do backend: na raiz, `python -m unittest discover -s tests -v`. O teste web cobre API e fluxo MCP real com Gemini simulado; a geração real depende da chave local. A CLI original continua disponível com `python main.py`.
+
+## Conta, perfil e conversas
+
+No primeiro acesso, escolha seu nome e uma senha de pelo menos 8 caracteres. Não existe senha padrão fixa. Depois, entre com essa senha. Clique no perfil no rodapé da barra lateral (engrenagem no cabeçalho em telas pequenas) para mudar o nome ou a senha. Alterar a senha exige a senha atual e encerra as outras sessões.
+
+`armazenamento.py` salva perfil, hash scrypt da senha, sessões e conversas no SQLite `.data/agente.db`. A pasta `.data/` é ignorada pelo Git: não é enviada ao GitHub. Preserve essa pasta para manter seus dados, inclusive ao trocar de cópia do projeto. O cookie de sessão é HttpOnly, SameSite Strict e dura até 7 dias. Esta é uma conta única para uso local; não é um sistema multiusuário de produção. A CLI permanece acessível ao usuário do Linux, independentemente do login web.
+
+As conversas são salvas após respostas concluídas com sucesso. Uma conversa nova vazia só aparece na lista após a primeira resposta. Conversas antigas da versão anterior não podem ser recuperadas, pois não eram persistidas. Histórico, ferramentas e fontes da última consulta são restaurados ao abrir uma conversa.
+
+## Perguntas gerais
+
+As instruções em `instrucoes.py` são compartilhadas entre CLI e interface. O agente pode responder perguntas gerais, como “O que é a Binance?”, sem exigir documentos locais. O RAG é usado para consultar o conteúdo dos documentos. Não há busca na internet nesta versão: notícias, preços e mudanças recentes não podem ser verificados pelo agente. Corrigimos as instruções restritivas anteriores, mas erros de quota ou credencial do Gemini ainda precisam ser corrigidos no provedor.
 
 ## Executar no Ubuntu
 

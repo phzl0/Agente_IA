@@ -13,3 +13,6 @@ __pycache__/
 # Interface web
 frontend/node_modules/
 frontend/dist/
+
+# Conta e conversas locais
+.data/
