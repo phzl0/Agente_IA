@@ -2,6 +2,46 @@
 
 Assistente de projetos pelo terminal, com Gemini e um servidor MCP local. As ferramentas listam arquivos na raiz e buscam trechos em documentos locais com RAG. Não executam comandos nem modificam arquivos.
 
+## Interface gráfica — React + FastAPI
+
+Interface escura com chat, sugestões, nova conversa, painel de atividades MCP, trechos e fontes do RAG. As atividades aparecem após a resposta completa; não há streaming nesta versão. O histórico fica só na memória da aba e é apagado ao recarregar ou iniciar nova conversa.
+
+Requisitos: Python 3.11+ e Node.js 20.19+ ou 22.12+ (recomendado Node 22 LTS). Mantenha sua chave no `.env` da raiz, nunca no frontend. Esta versão é local, sem autenticação nem publicação externa.
+
+Atualize a cópia existente e inicie o backend no primeiro terminal:
+
+```bash
+cd ~/Projetos/Agente_IA
+git pull --ff-only origin main
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python -m uvicorn api:app --host 127.0.0.1 --port 8000
+```
+
+Em um segundo terminal, inicie a interface:
+
+```bash
+cd ~/Projetos/Agente_IA/frontend
+npm ci
+npm run dev
+```
+
+Abra **http://localhost:5173** no navegador. Pare cada processo com Ctrl+C no respectivo terminal. Na primeira instalação, siga também a seção de configuração do `.env` abaixo.
+
+| Arquivo | Papel na versão gráfica |
+| --- | --- |
+| `frontend/src/App.tsx` | Chat, histórico da aba, atividade e fontes |
+| `frontend/src/style.css` | Tema escuro e layout responsivo |
+| `frontend/vite.config.ts` | Encaminha `/api` ao backend local na porta 8000 |
+| `api.py` | Recebe mensagens em `POST /api/chat` e devolve resposta, eventos e fontes |
+| `agente.py` | Ciclo compartilhado de chamadas de ferramentas da CLI e da interface |
+
+Fluxo: navegador → FastAPI → Gemini → cliente MCP → ferramenta RAG → Gemini → resposta com eventos e fontes no navegador. Cada consulta web abre e fecha sua própria sessão MCP. O histórico textual enviado pela aba mantém o contexto, sem misturar conversas de usuários. Não há histórico persistente ou upload de documentos: adicione textos na pasta `documentos/`.
+
+O indicador “API configurada” confirma a presença da chave, não valida credenciais nem cotas. Se aparecer “Backend indisponível”, confira se o primeiro terminal continua executando. Erros de consulta aparecem no chat; detalhes ficam no terminal Python. A API permite até 40 mensagens anteriores e 2.000 caracteres na pergunta. Use “Nova conversa” ao atingir o limite.
+
+Verificação do frontend: `cd frontend` e `npm run build`. Verificações do backend: na raiz, `python -m unittest discover -s tests -v`. O teste web cobre API e fluxo MCP real com Gemini simulado; a geração real depende da chave local. A CLI original continua disponível com `python main.py`.
+
 ## Executar no Ubuntu
 
 Na sua cópia já existente:

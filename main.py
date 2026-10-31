@@ -10,48 +10,7 @@ from mcp.client.stdio import stdio_client
 from config import LIMITE_RODADAS, MODELO, PASTA_PROJETO, SERVIDOR_MCP, obter_chave
 
 
-def declarar_ferramentas(ferramentas):
-    """Converte o catálogo MCP em declarações que o Gemini entende."""
-    return types.Tool(function_declarations=[
-        types.FunctionDeclaration(
-            name=ferramenta.name,
-            description=ferramenta.description or "",
-            parameters_json_schema=ferramenta.inputSchema,
-        )
-        for ferramenta in ferramentas
-    ])
-
-
-async def processar_mensagem(conversa, sessao, nomes_permitidos, mensagem):
-    resposta = await conversa.send_message(mensagem)
-    rodadas = 0
-
-    while resposta.function_calls:
-        if rodadas >= LIMITE_RODADAS:
-            # A sessão contém pedidos sem resposta; encerre em vez de reutilizá-la.
-            raise RuntimeError("Limite de rodadas de ferramentas atingido. Reinicie a CLI.")
-        rodadas += 1
-        resultados = []
-
-        for chamada in resposta.function_calls:
-            print(f"[MCP] Pedido: {chamada.name} | argumentos: {chamada.args or {}}")
-            if chamada.name not in nomes_permitidos:
-                resultado = {"erro": "Ferramenta não disponibilizada pelo servidor."}
-            else:
-                retorno = await sessao.call_tool(chamada.name, arguments=chamada.args or {})
-                resultado = {
-                    "erro": retorno.isError,
-                    "dados": retorno.structuredContent,
-                    "conteudo": [item.model_dump(mode="json") for item in retorno.content],
-                }
-            print(f"[MCP] Resultado: {resultado}")
-            resultados.append(types.Part.from_function_response(
-                name=chamada.name, response=resultado,
-            ))
-
-        resposta = await conversa.send_message(resultados)
-
-    print(f"\nAssistente: {resposta.text or 'O modelo não retornou texto.'}")
+from agente import declarar_ferramentas, processar_mensagem
 
 
 async def executar():
