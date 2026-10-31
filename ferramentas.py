@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 
@@ -6,7 +7,7 @@ PASTA_PROJETO = Path(__file__).resolve().parent
 
 def listar_arquivos() -> list[str]:
     """Lista os arquivos visíveis na pasta principal do projeto."""
-    print("\n[Ferramenta] Executando listar_arquivos")
+    print("[Ferramenta] Executando listar_arquivos", file=sys.stderr)
 
     arquivos = []
 
