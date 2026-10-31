@@ -1,24 +1,90 @@
-# Agente IA — beta
+# Agente IA — Beta
 
-Assistente de projetos pelo terminal, com Gemini e um servidor MCP local. As ferramentas listam arquivos na raiz e buscam trechos em documentos locais com RAG. Não executam comandos nem modificam arquivos.
+> **Projeto em fase beta.** Interface, recursos e integrações estão em evolução. Desenvolvido para aprender na prática como um agente conecta uma interface, um modelo de linguagem, ferramentas MCP e busca em documentos com RAG.
 
-## Interface gráfica — React + FastAPI
+Assistente de IA com **chat web em React**, **backend Python/FastAPI**, **API Gemini**, **servidor MCP local** e **RAG lexical**. Também pode ser utilizado pelo terminal (CLI).
 
-Interface de chat limpa: fundo preto, verde discreto, histórico lateral, mensagens centralizadas e campo de entrada fixo. Banners e auxiliar flutuante foram retirados da conversa. O robô permanece na marca e no favicon. Fontes e atividade ficam no painel opcional “Contexto”. Conversas são salvas no SQLite e aparecem na barra lateral. As atividades aparecem após a resposta completa; não há streaming nesta versão.
+## Comece aqui: executar no seu computador
 
-Requisitos: Python 3.11+ e Node.js 20.19+ ou 22.12+ (recomendado Node 22 LTS). Mantenha sua chave no `.env` da raiz, nunca no frontend. Esta versão é local, com uma conta pessoal e autenticação por cookie de sessão, sem publicação externa.
+O projeto funciona localmente, sem Docker ou hospedagem contratada. **É necessário ter internet e uma chave própria da API Gemini para receber respostas da IA.** A instalação das dependências também precisa de internet.
 
-Atualize a cópia existente e inicie o backend no primeiro terminal:
+Cada pessoa usa sua própria chave. Disponibilidade dos modelos, cotas gratuitas e cobrança dependem da conta no Google; o projeto não inclui créditos nem garante uso gratuito. A chave fica no backend, no arquivo `.env`.
+
+| Requisito | Versão / finalidade |
+| --- | --- |
+| Git | Baixar e atualizar o projeto |
+| Python | 3.11 ou superior, com suporte a ambientes virtuais |
+| Node.js + npm | Node 22.12+ ou uma versão LTS mais recente compatível com Vite 6 |
+| Chave Gemini | Obter no [Google AI Studio](https://aistudio.google.com/app/apikey) |
+
+**Portas utilizadas:** interface `5175` e backend `8005`. Os servidores ficam vinculados ao computador local. Esta beta não foi preparada para exposição pública nem para múltiplos usuários.
+
+### Linux / Ubuntu
+
+**1. Confira os requisitos.** Instale Git, Python e [Node.js](https://nodejs.org/) se ainda não estiverem disponíveis.
 
 ```bash
-cd ~/Projetos/Agente_IA
-git pull --ff-only origin main
+git --version
+python3 --version
+node --version
+npm --version
+```
+
+No Ubuntu, caso falte suporte ao ambiente virtual:
+
+```bash
+sudo apt update
+sudo apt install python3-venv
+```
+
+Se o Python pedir um pacote específico, como `python3.14-venv`, instale o pacote correspondente à versão utilizada.
+
+**2. Baixe o projeto.** A URL HTTPS abaixo não exige configurar uma chave SSH para clonar este repositório público.
+
+```bash
+mkdir -p ~/Projetos
+cd ~/Projetos
+git clone https://github.com/phzl0/Agente_IA.git
+cd Agente_IA
+```
+
+Se a pasta já existir, siga a seção [Atualizar uma instalação existente](#atualizar-uma-instalação-existente), sem clonar novamente dentro dela.
+
+**3. Crie o ambiente Python e instale as bibliotecas.** Execute sem `sudo`:
+
+```bash
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+```
+
+**4. Configure sua chave Gemini.** Estes comandos são apenas para a primeira instalação:
+
+```bash
+cp .env.example .env
+nano .env
+```
+
+Preencha a chave no arquivo:
+
+```dotenv
+GEMINI_API_KEY=cole_sua_chave_aqui
+GEMINI_MODEL=gemini-3.5-flash-lite
+```
+
+Substitua `cole_sua_chave_aqui` pela chave real, sem espaços extras. No Nano: salve com `Ctrl+O`, pressione `Enter` e saia com `Ctrl+X`. O modelo é configurável; se ele não estiver disponível na sua conta, escolha um modelo de texto compatível com chamadas de ferramentas e ajuste `GEMINI_MODEL`.
+
+**Não envie o `.env` ou a chave ao GitHub.** O `.gitignore` já ignora esse arquivo. Não copie o `.env.example` sobre um `.env` que já contém sua configuração.
+
+**5. Inicie o backend no primeiro terminal.** Continue na pasta `Agente_IA`, com o ambiente virtual ativo:
+
+```bash
 python -m uvicorn api:app --host 127.0.0.1 --port 8005
 ```
 
-Em um segundo terminal, inicie a interface:
+Aguarde a mensagem de inicialização em `http://127.0.0.1:8005`. **Deixe esse terminal aberto.**
+
+**6. Abra um segundo terminal e inicie a interface:**
 
 ```bash
 cd ~/Projetos/Agente_IA/frontend
@@ -26,130 +92,230 @@ npm ci
 npm run dev
 ```
 
-Abra **http://localhost:5175** no navegador. Pare cada processo com Ctrl+C no respectivo terminal. Na primeira instalação, siga também a seção de configuração do `.env` abaixo.
+**7. Abra [http://localhost:5175](http://localhost:5175).** Crie sua conta local com nome e senha de pelo menos 8 caracteres. Não existe usuário ou senha padrão. Essa senha é para entrar no projeto; não é a senha da conta Google nem a chave da API.
 
-| Arquivo | Papel na versão gráfica |
-| --- | --- |
-| `frontend/src/App.tsx` | Chat, conversas salvas, perfil, atividade e fontes |
-| `frontend/src/style.css` | Tema escuro e layout responsivo |
-| `frontend/vite.config.ts` | Encaminha `/api` ao backend local na porta 8005 |
-| `api.py` | Recebe mensagens em `POST /api/chat` e devolve resposta, eventos e fontes |
-| `agente.py` | Ciclo compartilhado de chamadas de ferramentas da CLI e da interface |
+### Windows — PowerShell
 
-Fluxo: navegador → FastAPI → Gemini → cliente MCP → ferramenta RAG → Gemini → resposta com eventos e fontes no navegador. Cada consulta web abre e fecha sua própria sessão MCP. O backend recupera o histórico salvo e usa as últimas 40 mensagens como contexto; o histórico completo continua armazenado. Não há upload de documentos: adicione textos na pasta `documentos/`.
+**1. Instale os requisitos:** [Git](https://git-scm.com/downloads), [Python 3.11+](https://www.python.org/downloads/windows/) e [Node.js LTS](https://nodejs.org/). Abra um novo PowerShell após a instalação e confira:
 
-O indicador “API configurada” confirma a presença da chave, não valida credenciais nem cotas. Se aparecer “Backend indisponível”, confira se o primeiro terminal continua executando. Erros de consulta aparecem no chat; detalhes ficam no terminal Python. A pergunta aceita até 2.000 caracteres. Novas conversas não apagam as anteriores; selecione uma conversa na barra lateral para retomá-la.
+```powershell
+git --version
+py -3 --version
+node --version
+npm --version
+```
 
-Verificação do frontend: `cd frontend` e `npm run build`. Verificações do backend: na raiz, `python -m unittest discover -s tests -v`. O teste web cobre API e fluxo MCP real com Gemini simulado; a geração real depende da chave local. A CLI original continua disponível com `python main.py`.
+Se `py` não existir, mas `python --version` mostrar uma versão compatível, use `python` no lugar de `py -3` no comando que cria o ambiente virtual.
 
-## Padrão de respostas
+**2. Baixe o projeto:**
 
-`frontend/src/Resposta.tsx` renderiza Markdown com `react-markdown` e `remark-gfm`. Marcadores como `**negrito**`, títulos com `#`, listas e tabelas viram elementos visuais, inclusive nas conversas antigas. Citações (`>`) aparecem como cards discretos de observação; blocos de código têm cabeçalho e botão de copiar. Também é possível copiar a resposta inteira.
+```powershell
+New-Item -ItemType Directory -Force -Path "$HOME\Projetos" | Out-Null
+Set-Location "$HOME\Projetos"
+git clone https://github.com/phzl0/Agente_IA.git
+Set-Location Agente_IA
+```
 
-As instruções em `instrucoes.py` pedem respostas diretas, parágrafos curtos e destaques quando úteis, sem símbolos decorativos. Símbolos válidos em código, fórmulas e preços são preservados: não existe uma remoção indiscriminada de caracteres. A estrutura final ainda depende do modelo. Não há suporte a diagramas interativos ou renderização de LaTeX nesta versão.
+**3. Crie o ambiente e instale as bibliotecas:**
 
-HTML bruto não é executado; links com protocolos inseguros são bloqueados pelo renderizador. Teste da formatação: `cd frontend` e `npm test`. O teste verifica negrito, listas, tabelas, cards, código e descarte de HTML executável.
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
 
-## Conta, perfil e conversas
+Usamos o Python do ambiente diretamente, sem precisar ativá-lo nem alterar a política de execução do PowerShell.
 
-No primeiro acesso, escolha seu nome e uma senha de pelo menos 8 caracteres. Não existe senha padrão fixa. Depois, entre com essa senha. Clique no perfil no rodapé da barra lateral (engrenagem no cabeçalho em telas pequenas) para mudar o nome ou a senha. Alterar a senha exige a senha atual e encerra as outras sessões.
+**4. Crie o `.env` na primeira instalação e edite no Bloco de Notas:**
 
-`armazenamento.py` salva perfil, hash scrypt da senha, sessões e conversas no SQLite `.data/agente.db`. A pasta `.data/` é ignorada pelo Git: não é enviada ao GitHub. Preserve essa pasta para manter seus dados, inclusive ao trocar de cópia do projeto. O cookie de sessão é HttpOnly, SameSite Strict e dura até 7 dias. Esta é uma conta única para uso local; não é um sistema multiusuário de produção. A CLI permanece acessível ao usuário do Linux, independentemente do login web.
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
 
-As conversas são salvas após respostas concluídas com sucesso. Uma conversa nova vazia só aparece na lista após a primeira resposta. Conversas antigas da versão anterior não podem ser recuperadas, pois não eram persistidas. Histórico, ferramentas e fontes da última consulta são restaurados ao abrir uma conversa.
+Preencha `GEMINI_API_KEY` e mantenha ou ajuste `GEMINI_MODEL`, conforme o exemplo da seção Linux. Salve como `.env`, sem acrescentar `.txt`. Não sobrescreva esse arquivo em atualizações.
 
-## Perguntas gerais
+**5. No primeiro terminal, inicie o backend:**
 
-As instruções em `instrucoes.py` são compartilhadas entre CLI e interface. O agente pode responder perguntas gerais, como “O que é a Binance?”, sem exigir documentos locais. O RAG é usado para consultar o conteúdo dos documentos. Não há busca na internet nesta versão: notícias, preços e mudanças recentes não podem ser verificados pelo agente. Corrigimos as instruções restritivas anteriores, mas erros de quota ou credencial do Gemini ainda precisam ser corrigidos no provedor.
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8005
+```
 
-## Executar no Ubuntu
+Deixe esse terminal aberto.
 
-Na sua cópia já existente:
+**6. Em um segundo PowerShell, inicie a interface:**
+
+```powershell
+Set-Location "$HOME\Projetos\Agente_IA\frontend"
+npm ci
+npm run dev
+```
+
+**7. Abra [http://localhost:5175](http://localhost:5175)** e crie sua conta local. Se o PowerShell bloquear `npm.ps1`, use `npm.cmd ci` e `npm.cmd run dev`, sem alterar a política de execução.
+
+As verificações automatizadas e a conferência visual foram executadas em Linux. O roteiro PowerShell utiliza os caminhos equivalentes, mas não foi executado em uma máquina Windows nesta etapa.
+
+## Experimente a beta
+
+No chat, teste:
+
+- **Pergunta geral:** “O que é uma API?” ou “O que é a Binance?”. Não exige documentos locais.
+- **Ferramenta MCP:** “Liste os arquivos da pasta principal deste projeto.”
+- **RAG:** “Consulte os documentos: quanto XP uma missão diária concede?”
+
+O documento `documentos/exemplo_progress_hub.md` contém **regras fictícias de demonstração**, incluindo 300 XP por missão diária. Abra **Contexto** para ver as ferramentas utilizadas e os trechos recuperados na última consulta. Esses dados aparecem quando a resposta termina, sem streaming.
+
+Adicione arquivos `.md` e `.txt` em UTF-8 na pasta `documentos/`, inclusive em subpastas. A próxima busca já usa o conteúdo atualizado: não precisa indexar manualmente. Os trechos encontrados são enviados à API Gemini para gerar a resposta.
+
+## Atualizar uma instalação existente
+
+Pare backend e interface com `Ctrl+C` nos respectivos terminais antes de atualizar. Na raiz do projeto:
+
+```bash
+git pull --ff-only origin main
+```
+
+**Linux — primeiro terminal:**
 
 ```bash
 cd ~/Projetos/Agente_IA
-git pull --ff-only origin main
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+python -m uvicorn api:app --host 127.0.0.1 --port 8005
+```
+
+**Windows — primeiro PowerShell:**
+
+```powershell
+Set-Location "$HOME\Projetos\Agente_IA"
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m uvicorn api:app --host 127.0.0.1 --port 8005
+```
+
+**Segundo terminal, dentro de `Agente_IA/frontend`:**
+
+```bash
+npm ci
+npm run dev
+```
+
+Se a tela parecer antiga, recarregue com `Ctrl+Shift+R`. Preserve o `.env` e a pasta `.data/`: eles contêm sua configuração e seus dados locais.
+
+## Parar e abrir novamente
+
+Use `Ctrl+C` em cada terminal para parar. Isso não apaga as conversas.
+
+Para abrir novamente, inicie o backend e depois execute `npm run dev` na pasta `frontend`. Não precisa clonar, criar outra `.venv`, copiar o `.env` ou instalar bibliotecas novamente, a menos que esteja atualizando dependências.
+
+## Problemas comuns
+
+| Problema | O que fazer |
+| --- | --- |
+| `ensurepip is not available` | Instale `python3-venv` ou o pacote específico indicado pelo Python e recrie `.venv` sem `sudo`. |
+| `Permission denied` após criar `.venv` com `sudo` | Na raiz do projeto, ajuste apenas essa pasta com `sudo chown -R "$USER":"$(id -gn)" .venv` e recrie com `python3 -m venv .venv`. |
+| `ModuleNotFoundError` | Use o Python da `.venv` e instale `requirements.txt`. No Windows, execute pelo caminho `.venv\Scripts\python.exe`. |
+| `npm` não encontrado ou Node incompatível | Instale uma versão compatível do Node.js e abra um novo terminal. |
+| `Port 5175 is already in use` | Confira se outra instância do frontend está aberta. Se a porta pertencer a outro projeto, altere `server.port` em `frontend/vite.config.ts`. |
+| Backend: `address already in use` na porta `8005` | Confira se já iniciou o backend. Para usar outra porta, altere o comando `--port` e o destino do proxy `/api` em `frontend/vite.config.ts` para o mesmo número. |
+| “Backend indisponível” ou erro ao criar conta | Inicie o backend e confira se o proxy aponta para a porta dele. Recarregue a página após iniciar. |
+| “Configure GEMINI_API_KEY” | Confira o `.env` na raiz, o nome da variável e se o arquivo não foi salvo como `.env.txt`. Reinicie o backend após editar. |
+| “API configurada”, mas o chat falha | O indicador confirma apenas a presença da chave. Veja o erro no terminal Python: credenciais, cota, modelo ou acesso à internet podem impedir a consulta. |
+| Modelo não encontrado / erro 404 | Ajuste `GEMINI_MODEL` para um modelo compatível disponível à sua conta e reinicie o backend. |
+| Limite de requisições / erro 429 | Verifique as cotas do projeto no Google AI Studio e aguarde a liberação indicada pelo provedor. |
+| Conversa nova não aparece na lista | Ela é salva depois da primeira resposta concluída com sucesso. Conversas vazias ou solicitações que falharam não criam histórico. |
+| RAG não encontra uma resposta | Use `.md` ou `.txt` em UTF-8 dentro de `documentos/` e termos presentes no texto. A busca é por palavras, não por significado. |
+
+## Conta, perfil e dados locais
+
+Uma conta pessoal por instalação. Clique no perfil, no rodapé da barra lateral, para alterar nome ou senha; em telas pequenas, use a engrenagem no cabeçalho. Alterar a senha exige a senha atual e encerra as outras sessões.
+
+O SQLite em `.data/agente.db` guarda o perfil, o hash scrypt da senha, sessões e conversas. `.data/` e `.env` são ignorados pelo Git e não são transferidos com `git clone` ou `git pull`.
+
+Para fazer backup, pare o backend e copie a pasta `.data/` e o `.env` para um local privado. Preserve esses arquivos ao mudar de computador ou reinstalar. Não há recuperação de senha pela interface nesta beta.
+
+As conversas completas ficam salvas; o modelo recebe as últimas 40 mensagens como contexto. Cada conversa também preserva as fontes e atividades da última consulta. Na CLI, o histórico fica somente na memória até encerrar o programa; o login web não bloqueia a CLI para o usuário do sistema operacional.
+
+## Usar somente pelo terminal — CLI
+
+Após instalar as dependências Python e configurar o `.env`, não é necessário iniciar FastAPI ou React.
+
+**Linux, na raiz do projeto:**
+
+```bash
+source .venv/bin/activate
 python main.py
 ```
 
-Na primeira instalação:
+**Windows / PowerShell, na raiz:**
 
-```bash
-git clone git@github.com:phzl0/Agente_IA.git
-cd Agente_IA
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt
-cp .env.example .env
-nano .env
+```powershell
+.\.venv\Scripts\python.exe main.py
 ```
 
-Preencha `GEMINI_API_KEY` com sua chave. O `GEMINI_MODEL` é opcional e usa `gemini-3.5-flash-lite` por padrão. Não substitua seu `.env` existente: ele continua válido. O arquivo não deve ser enviado ao GitHub. A disponibilidade, as cotas e a cobrança dependem do modelo e da conta no provedor.
+Digite `sair` ou pressione `Ctrl+C` para encerrar. A própria CLI inicia e encerra o servidor MCP.
 
-Depois execute `python main.py`. Pergunte: “Consulte os arquivos da pasta principal”. Digite `sair` ou use Ctrl+C para encerrar. A CLI inicia e encerra o servidor automaticamente; não há porta HTTP nem segundo terminal.
+## Tecnologias e fluxo
 
-## Onde cada conexão acontece
-
-| Arquivo / ponto | Responsabilidade |
+| Camada | Tecnologia / responsabilidade |
 | --- | --- |
-| `config.py` / `load_dotenv` | Lê o `.env` na pasta do projeto |
-| `config.py` / `obter_chave`, `MODELO` | Define chave da API e modelo |
-| `main.py` / `genai.Client` | Configura o cliente da API do Gemini |
-| `main.py` / `conversa.send_message` | Envia mensagens e resultados ao Google pela internet |
-| `main.py` / `StdioServerParameters` | Define o Python e o script do servidor local |
-| `main.py` / `stdio_client`, `ClientSession` | Abre o processo MCP e inicializa a conexão |
-| `main.py` / `list_tools`, `declarar_ferramentas` | Descobre ferramentas e traduz o catálogo para o Gemini |
-| `main.py` / `processar_mensagem`, `call_tool` | Recebe o pedido do modelo e o encaminha ao MCP |
-| `servidor_mcp.py` / `@servidor.tool()` | Registra a ferramenta no servidor |
-| `ferramentas.py` / `listar_arquivos` | Consulta os nomes no sistema de arquivos |
+| Interface | React, TypeScript e Vite |
+| Backend web | Python, FastAPI e Uvicorn |
+| Modelo | API Gemini pelo SDK `google-genai` |
+| Ferramentas | MCP Python SDK v1, transporte local `stdio` |
+| RAG | Recuperação lexical BM25, índice em memória |
+| Persistência | SQLite |
+| Respostas | Markdown com `react-markdown` e `remark-gfm` |
 
-## Fluxo
+**Fluxo web:** React → FastAPI → agente → Gemini → pedido de ferramenta → MCP → função local / RAG → resultado ao Gemini → resposta no chat.
 
-1. A CLI inicia um processo Python para o servidor MCP, usando o mesmo ambiente virtual.
-2. Cliente e servidor fazem a inicialização MCP; a CLI consulta o catálogo de ferramentas.
-3. O Gemini recebe a mensagem e as descrições das ferramentas.
-4. Se o modelo pedir uma ferramenta, a CLI encaminha nome e argumentos pelo MCP.
-5. O servidor executa a função local e retorna os dados.
-6. A CLI envia o resultado ao Gemini, que produz a resposta exibida no terminal.
+O modelo solicita uma ferramenta; o Python executa. MCP padroniza a conexão. RAG busca trechos e fontes para fundamentar a geração. Quando uma pergunta é geral, o modelo pode responder sem consultar os documentos.
 
-MCP usa `stdio`: entrada e saída padrão carregam o protocolo entre processos. Logs da ferramenta usam `stderr` para não corromper essa comunicação. O servidor mantém sua pasta de consulta fixa na raiz do projeto. O Gemini recebe os nomes retornados, não acesso direto ao computador.
-
-O histórico vive na memória do processo e é reenviado pelo SDK nas próximas mensagens. Ao fechar a CLI, ele é perdido. Cada turno permite até três rodadas de ferramentas; falhas encerram a sessão com diagnóstico em vez de continuar com pedidos incompletos. A resposta final é impressa uma única vez.
-
-## RAG na prática
-
-Esta versão usa busca lexical BM25 (por palavras), sem embeddings, banco externo ou nova API. A geração continua usando a API Gemini e suas cotas. Sinônimos sem palavras em comum podem não ser encontrados.
-
-Execute a CLI e pergunte:
-
-> Consulte os documentos: quanto XP uma missão diária concede?
-
-O exemplo em `documentos/exemplo_progress_hub.md` é fictício e informa 300 XP. O terminal mostra a chamada `buscar_documentos`, os trechos retornados e, depois, a resposta do modelo. A instrução do agente pede citações no formato `[arquivo:linhas]`. A geração das citações depende do modelo; não é uma validação automática de veracidade.
-
-Para observar a diferença, edite o valor no documento e repita: “Consulte novamente os documentos: quanto XP uma missão diária concede?”. A próxima consulta reconstrói o índice com o novo conteúdo.
-
-| Ponto | O que acontece |
+| Arquivo | Onde a implementação acontece |
 | --- | --- |
-| `documentos/` | Fonte dos arquivos `.md` e `.txt` em UTF-8 |
-| `rag.py` / `indexar_documentos` | Divide textos em trechos com arquivo e linhas e cria índice em memória |
-| `rag.py` / `buscar_documentos` | Classifica por BM25 e retorna até 3 trechos por padrão |
-| `servidor_mcp.py` / `buscar_documentos` | Disponibiliza a busca como ferramenta MCP |
-| `main.py` / `processar_mensagem` | Envia ao Gemini o resultado recuperado para gerar a resposta |
+| `config.py` | Carrega `.env`, chave, modelo e caminhos |
+| `api.py` | Endpoints de chat, conta, perfil e conversas; conexão com Gemini e MCP na web |
+| `main.py` | Entrada da CLI e conexão com Gemini/MCP pelo terminal |
+| `agente.py` | Ciclo compartilhado de pedidos e resultados de ferramentas |
+| `instrucoes.py` | Comportamento geral e padrão de resposta do modelo |
+| `servidor_mcp.py` | Registro das ferramentas `listar_arquivos` e `buscar_documentos` |
+| `ferramentas.py` | Lista nomes de arquivos na raiz do projeto |
+| `rag.py` | Divide documentos em trechos e recupera os relevantes |
+| `armazenamento.py` | Conta, sessões e conversas no SQLite |
+| `frontend/src/App.tsx` | Chat, histórico, perfil e painel Contexto |
+| `frontend/src/Resposta.tsx` | Negrito, listas, tabelas, cards e código com botão de copiar |
+| `frontend/vite.config.ts` | Porta da interface e proxy de `/api` para FastAPI |
 
-Fluxo: pergunta → Gemini solicita busca → MCP chama RAG → trechos e fontes → Gemini responde.
+## Limites da beta
 
-Adicione seus próprios `.md` ou `.txt` dentro de `documentos/`, inclusive em subpastas. Cada consulta refaz o índice: não precisa executar comando de indexação. Arquivos ocultos, links simbólicos, arquivos inválidos em UTF-8 e arquivos maiores que 1 MB são ignorados. PDFs ainda não são suportados. Os trechos têm até 1.800 caracteres, com até 12 linhas por trecho; a ferramenta devolve no máximo 5 trechos. É uma implementação didática para pequenas coleções, sem persistência nem busca semântica.
+- Não há busca na internet: notícias, preços ou mudanças recentes não são verificados pelo agente.
+- O RAG usa palavras e BM25, sem embeddings ou banco vetorial; sinônimos sem palavras em comum podem não ser encontrados.
+- PDFs e upload pela interface ainda não são suportados. Arquivos ocultos, links simbólicos, textos inválidos em UTF-8 e arquivos maiores que 1 MB são ignorados.
+- Trechos de até 1.800 caracteres e 12 linhas; a ferramenta retorna até 3 trechos por padrão, com limite máximo de 5.
+- Cada turno permite até três rodadas de ferramentas. A listagem informa somente nomes; as ferramentas atuais não editam arquivos nem executam comandos.
+- Fontes e respostas são geradas com auxílio do modelo; uma citação não garante que a conclusão esteja correta.
+- HTML bruto não é executado no chat. Markdown é suportado, mas LaTeX e diagramas interativos ainda não.
 
-Os trechos recuperados são enviados ao Google para responder à pergunta. Documentos são tratados como dados de consulta, e a instrução do agente pede que ele ignore comandos contidos neles. Se não houver evidência suficiente, a orientação é dizer que não encontrou a resposta; um resultado lexical não garante que o trecho seja relevante.
+## Verificações
 
-## Verificação do projeto
+**Backend — Linux, com `.venv` ativa:**
 
 ```bash
 python -m unittest discover -s tests -v
 ```
 
-O teste inicia o servidor MCP real, descobre e chama a ferramenta, confere o retorno ao ciclo de conversa e a rejeição de ferramenta inexistente. Também verifica a busca RAG via MCP, fontes, atualização dos documentos, ausência de resultados e limites dos trechos. A resposta do Gemini é simulada: não exige chave e não consome cota. A chamada real ao Google depende da chave local do usuário.
+**Backend — Windows / PowerShell:**
 
-Dependências diretas fixadas nas versões verificadas: Gemini SDK 2.34.0, MCP Python SDK 1.30.0 (API v1) e python-dotenv 1.2.4. Os scripts `testar_ia.py`, `listar_modelos.py` e `verificar_config.py` permanecem como exemplos das etapas anteriores; a entrada principal é `main.py`.
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+**Frontend — dentro de `frontend`, nos dois sistemas:**
+
+```bash
+npm ci
+npm test
+npm run build
+```
+
+Os testes do backend verificam API, conta/senha, persistência, MCP real e recuperação RAG com o Gemini simulado, sem chave ou consumo de cota. O frontend testa a renderização Markdown e bloqueio de HTML executável. A geração real exige a chave local do usuário.
+
+Os scripts `testar_ia.py`, `listar_modelos.py` e `verificar_config.py` permanecem como exemplos das etapas iniciais de aprendizado. As entradas principais são a interface web e `main.py`.
