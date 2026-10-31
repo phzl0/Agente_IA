@@ -1,6 +1,6 @@
 # Agente IA — beta
 
-Assistente de projetos pelo terminal, com Gemini e um servidor MCP local. A ferramenta atual lista nomes de arquivos na raiz do projeto. Não lê conteúdo, não executa comandos e não implementa RAG ainda.
+Assistente de projetos pelo terminal, com Gemini e um servidor MCP local. As ferramentas listam arquivos na raiz e buscam trechos em documentos locais com RAG. Não executam comandos nem modificam arquivos.
 
 ## Executar no Ubuntu
 
@@ -58,9 +58,31 @@ MCP usa `stdio`: entrada e saída padrão carregam o protocolo entre processos. 
 
 O histórico vive na memória do processo e é reenviado pelo SDK nas próximas mensagens. Ao fechar a CLI, ele é perdido. Cada turno permite até três rodadas de ferramentas; falhas encerram a sessão com diagnóstico em vez de continuar com pedidos incompletos. A resposta final é impressa uma única vez.
 
-## Próxima etapa: RAG
+## RAG na prática
 
-RAG será uma ferramenta adicional: documentos serão divididos em trechos e indexados; uma busca recuperará os trechos relevantes para a pergunta; esses trechos e suas fontes serão devolvidos por MCP ao modelo. MCP cuida da conexão com a ferramenta. RAG cuida da recuperação do conteúdo. Essa etapa ainda não está implementada.
+Esta versão usa busca lexical BM25 (por palavras), sem embeddings, banco externo ou nova API. A geração continua usando a API Gemini e suas cotas. Sinônimos sem palavras em comum podem não ser encontrados.
+
+Execute a CLI e pergunte:
+
+> Consulte os documentos: quanto XP uma missão diária concede?
+
+O exemplo em `documentos/exemplo_progress_hub.md` é fictício e informa 300 XP. O terminal mostra a chamada `buscar_documentos`, os trechos retornados e, depois, a resposta do modelo. A instrução do agente pede citações no formato `[arquivo:linhas]`. A geração das citações depende do modelo; não é uma validação automática de veracidade.
+
+Para observar a diferença, edite o valor no documento e repita: “Consulte novamente os documentos: quanto XP uma missão diária concede?”. A próxima consulta reconstrói o índice com o novo conteúdo.
+
+| Ponto | O que acontece |
+| --- | --- |
+| `documentos/` | Fonte dos arquivos `.md` e `.txt` em UTF-8 |
+| `rag.py` / `indexar_documentos` | Divide textos em trechos com arquivo e linhas e cria índice em memória |
+| `rag.py` / `buscar_documentos` | Classifica por BM25 e retorna até 3 trechos por padrão |
+| `servidor_mcp.py` / `buscar_documentos` | Disponibiliza a busca como ferramenta MCP |
+| `main.py` / `processar_mensagem` | Envia ao Gemini o resultado recuperado para gerar a resposta |
+
+Fluxo: pergunta → Gemini solicita busca → MCP chama RAG → trechos e fontes → Gemini responde.
+
+Adicione seus próprios `.md` ou `.txt` dentro de `documentos/`, inclusive em subpastas. Cada consulta refaz o índice: não precisa executar comando de indexação. Arquivos ocultos, links simbólicos, arquivos inválidos em UTF-8 e arquivos maiores que 1 MB são ignorados. PDFs ainda não são suportados. Os trechos têm até 1.800 caracteres, com até 12 linhas por trecho; a ferramenta devolve no máximo 5 trechos. É uma implementação didática para pequenas coleções, sem persistência nem busca semântica.
+
+Os trechos recuperados são enviados ao Google para responder à pergunta. Documentos são tratados como dados de consulta, e a instrução do agente pede que ele ignore comandos contidos neles. Se não houver evidência suficiente, a orientação é dizer que não encontrou a resposta; um resultado lexical não garante que o trecho seja relevante.
 
 ## Verificação do projeto
 
@@ -68,6 +90,6 @@ RAG será uma ferramenta adicional: documentos serão divididos em trechos e ind
 python -m unittest discover -s tests -v
 ```
 
-O teste inicia o servidor MCP real, descobre e chama a ferramenta, confere o retorno ao ciclo de conversa e a rejeição de ferramenta inexistente. A resposta do Gemini é simulada: não exige chave e não consome cota. A chamada real ao Google depende da chave local do usuário.
+O teste inicia o servidor MCP real, descobre e chama a ferramenta, confere o retorno ao ciclo de conversa e a rejeição de ferramenta inexistente. Também verifica a busca RAG via MCP, fontes, atualização dos documentos, ausência de resultados e limites dos trechos. A resposta do Gemini é simulada: não exige chave e não consome cota. A chamada real ao Google depende da chave local do usuário.
 
 Dependências diretas fixadas nas versões verificadas: Gemini SDK 2.34.0, MCP Python SDK 1.30.0 (API v1) e python-dotenv 1.2.4. Os scripts `testar_ia.py`, `listar_modelos.py` e `verificar_config.py` permanecem como exemplos das etapas anteriores; a entrada principal é `main.py`.

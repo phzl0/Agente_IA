@@ -31,15 +31,18 @@ class IntegracaoMCP(unittest.IsolatedAsyncioTestCase):
                 await sessao.initialize()
                 catalogo = await sessao.list_tools()
                 nomes = {f.name for f in catalogo.tools}
-                self.assertEqual(nomes, {"listar_arquivos"})
+                self.assertEqual(nomes, {"listar_arquivos", "buscar_documentos"})
                 declaracao = declarar_ferramentas(catalogo.tools)
-                self.assertEqual(declaracao.function_declarations[0].name, "listar_arquivos")
+                self.assertEqual({d.name for d in declaracao.function_declarations}, nomes)
                 conversa = ConversaSimulada()
                 await processar_mensagem(conversa, sessao, nomes, "Liste os arquivos")
                 retorno = conversa.mensagens[1][0].function_response.response
                 self.assertFalse(retorno["erro"])
                 self.assertIn("main.py", str(retorno))
                 self.assertNotIn(".env", str(retorno))
+                busca = await sessao.call_tool("buscar_documentos", {"pergunta": "quantos XP missão diária"})
+                self.assertFalse(busca.isError)
+                self.assertIn("300", str(busca.content))
                 rejeitado = await sessao.call_tool("ferramenta_inexistente", {})
                 self.assertTrue(rejeitado.isError)
 
