@@ -15,7 +15,7 @@ cd ~/Projetos/Agente_IA
 git pull --ff-only origin main
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m uvicorn api:app --host 127.0.0.1 --port 8000
+python -m uvicorn api:app --host 127.0.0.1 --port 8005
 ```
 
 Em um segundo terminal, inicie a interface:
@@ -26,13 +26,13 @@ npm ci
 npm run dev
 ```
 
-Abra **http://localhost:5173** no navegador. Pare cada processo com Ctrl+C no respectivo terminal. Na primeira instalação, siga também a seção de configuração do `.env` abaixo.
+Abra **http://localhost:5175** no navegador. Pare cada processo com Ctrl+C no respectivo terminal. Na primeira instalação, siga também a seção de configuração do `.env` abaixo.
 
 | Arquivo | Papel na versão gráfica |
 | --- | --- |
 | `frontend/src/App.tsx` | Chat, histórico da aba, atividade e fontes |
 | `frontend/src/style.css` | Tema escuro e layout responsivo |
-| `frontend/vite.config.ts` | Encaminha `/api` ao backend local na porta 8000 |
+| `frontend/vite.config.ts` | Encaminha `/api` ao backend local na porta 8005 |
 | `api.py` | Recebe mensagens em `POST /api/chat` e devolve resposta, eventos e fontes |
 | `agente.py` | Ciclo compartilhado de chamadas de ferramentas da CLI e da interface |
 
