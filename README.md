@@ -4,7 +4,7 @@ Assistente de projetos pelo terminal, com Gemini e um servidor MCP local. As fer
 
 ## Interface gráfica — React + FastAPI
 
-Interface preta e verde neon, banners digitais, robô triste na marca e favicon, auxiliar Bit, chat e fontes RAG. Conversas são salvas no SQLite e aparecem na barra lateral. As atividades aparecem após a resposta completa; não há streaming nesta versão.
+Interface de chat limpa: fundo preto, verde discreto, histórico lateral, mensagens centralizadas e campo de entrada fixo. Banners e auxiliar flutuante foram retirados da conversa. O robô permanece na marca e no favicon. Fontes e atividade ficam no painel opcional “Contexto”. Conversas são salvas no SQLite e aparecem na barra lateral. As atividades aparecem após a resposta completa; não há streaming nesta versão.
 
 Requisitos: Python 3.11+ e Node.js 20.19+ ou 22.12+ (recomendado Node 22 LTS). Mantenha sua chave no `.env` da raiz, nunca no frontend. Esta versão é local, com uma conta pessoal e autenticação por cookie de sessão, sem publicação externa.
 
@@ -41,6 +41,14 @@ Fluxo: navegador → FastAPI → Gemini → cliente MCP → ferramenta RAG → G
 O indicador “API configurada” confirma a presença da chave, não valida credenciais nem cotas. Se aparecer “Backend indisponível”, confira se o primeiro terminal continua executando. Erros de consulta aparecem no chat; detalhes ficam no terminal Python. A pergunta aceita até 2.000 caracteres. Novas conversas não apagam as anteriores; selecione uma conversa na barra lateral para retomá-la.
 
 Verificação do frontend: `cd frontend` e `npm run build`. Verificações do backend: na raiz, `python -m unittest discover -s tests -v`. O teste web cobre API e fluxo MCP real com Gemini simulado; a geração real depende da chave local. A CLI original continua disponível com `python main.py`.
+
+## Padrão de respostas
+
+`frontend/src/Resposta.tsx` renderiza Markdown com `react-markdown` e `remark-gfm`. Marcadores como `**negrito**`, títulos com `#`, listas e tabelas viram elementos visuais, inclusive nas conversas antigas. Citações (`>`) aparecem como cards discretos de observação; blocos de código têm cabeçalho e botão de copiar. Também é possível copiar a resposta inteira.
+
+As instruções em `instrucoes.py` pedem respostas diretas, parágrafos curtos e destaques quando úteis, sem símbolos decorativos. Símbolos válidos em código, fórmulas e preços são preservados: não existe uma remoção indiscriminada de caracteres. A estrutura final ainda depende do modelo. Não há suporte a diagramas interativos ou renderização de LaTeX nesta versão.
+
+HTML bruto não é executado; links com protocolos inseguros são bloqueados pelo renderizador. Teste da formatação: `cd frontend` e `npm test`. O teste verifica negrito, listas, tabelas, cards, código e descarte de HTML executável.
 
 ## Conta, perfil e conversas
 
