@@ -21,8 +21,10 @@ from agente import declarar_ferramentas, processar_mensagem
 from config import MODELO, PASTA_PROJETO, SERVIDOR_MCP, obter_chave
 
 def exigir_sessao(request: Request):
-    if not db.sessao_valida(request.cookies.get("agente_sessao")):
+    conta_id = db.conta_da_sessao(request.cookies.get("agente_sessao"))
+    if conta_id is None:
         raise HTTPException(401, "Entre na sua conta local.")
+    return conta_id
 
 
 def cookie(response, token):
@@ -97,8 +99,8 @@ async def responder(pedido):
     return {"resposta": texto, "eventos": eventos, "fontes": extrair_fontes(eventos)}
 
 
-@app.post("/api/chat", dependencies=[Depends(exigir_sessao)])
-async def chat(pedido: Pedido):
+@app.post("/api/chat")
+async def chat(pedido: Pedido, conta_id: int = Depends(exigir_sessao)):
     if not pedido.mensagem.strip():
         raise HTTPException(422, "Digite uma mensagem.")
     try:
@@ -106,7 +108,7 @@ async def chat(pedido: Pedido):
     except ValueError:
         raise HTTPException(503, "Configure GEMINI_API_KEY no .env e reinicie o backend.") from None
     identificador = pedido.conversa_id or secrets.token_urlsafe(16)
-    anterior = db.ler_conversa(identificador) if pedido.conversa_id else None
+    anterior = db.ler_conversa(identificador, conta_id) if pedido.conversa_id else None
     if pedido.conversa_id and anterior is None:
         raise HTTPException(404, "Conversa não encontrada.")
     mensagens = anterior['mensagens'] if anterior else []
@@ -114,7 +116,7 @@ async def chat(pedido: Pedido):
     try:
         resultado = await asyncio.wait_for(responder(pedido), timeout=90)
         mensagens += [{"role":"user","text":pedido.mensagem},{"role":"model","text":resultado['resposta']}]
-        db.salvar(identificador,mensagens,resultado['eventos'],resultado['fontes'])
+        db.salvar(identificador,mensagens,resultado['eventos'],resultado['fontes'], conta_id)
         return resultado | {"conversa_id":identificador}
     except TimeoutError:
         raise HTTPException(504, "A consulta demorou demais. Tente novamente.") from None
@@ -124,7 +126,7 @@ async def chat(pedido: Pedido):
 
 
 class Credenciais(BaseModel):
-    nome: str = Field(default="Paulo", min_length=1, max_length=60)
+    nome: str = Field(min_length=1, max_length=60)
     senha: str = Field(min_length=8, max_length=128)
 
 
@@ -136,21 +138,27 @@ class PerfilNovo(BaseModel):
 
 @app.get("/api/conta")
 async def conta(request: Request):
-    usuario=db.perfil()
-    autenticado=db.sessao_valida(request.cookies.get("agente_sessao"))
-    return {"configurada":bool(usuario),"autenticado":autenticado,"nome":usuario['nome'] if usuario and autenticado else ""}
+    conta_id = db.conta_da_sessao(request.cookies.get("agente_sessao"))
+    usuario = db.perfil(conta_id) if conta_id is not None else None
+    return {
+        "configurada": bool(usuario or db.perfil()),
+        "autenticado": usuario is not None,
+        "nome": usuario["nome"] if usuario else "",
+        "usuario": usuario["usuario"] if usuario else "",
+    }
 
 
 @app.post("/api/conta/configurar")
 async def configurar(dados: Credenciais, response: Response):
-    if not dados.nome.strip():
-        raise HTTPException(422,"Informe seu nome.")
+    nome = dados.nome.strip()
+    if not nome:
+        raise HTTPException(422, "Informe seu nome de usuário.")
     try:
-        db.configurar(dados.nome.strip(),dados.senha)
+        conta_id = db.configurar(nome, dados.senha)
     except sqlite3.IntegrityError:
-        raise HTTPException(409,"Conta já configurada. Entre com sua senha.") from None
-    cookie(response,db.sessao_nova())
-    return {"nome":dados.nome.strip()}
+        raise HTTPException(409, "Esse nome de usuário já está em uso.") from None
+    cookie(response, db.sessao_nova(conta_id))
+    return db.perfil(conta_id)
 
 
 # Limite simples para tentativas no ambiente local.
@@ -163,12 +171,13 @@ async def entrar(dados: Credenciais, response: Response):
     _tentativas[:]=[t for t in _tentativas if t>agora-60]
     if len(_tentativas)>=10:
         raise HTTPException(429,"Aguarde um minuto antes de tentar novamente.")
-    if not db.conferir(dados.senha):
+    conta_id = db.autenticar(dados.nome.strip(), dados.senha)
+    if conta_id is None:
         _tentativas.append(agora)
-        raise HTTPException(401,"Senha incorreta.")
+        raise HTTPException(401,"Usuário ou senha incorretos.")
     _tentativas.clear()
-    cookie(response,db.sessao_nova())
-    return db.perfil()
+    cookie(response,db.sessao_nova(conta_id))
+    return db.perfil(conta_id)
 
 
 @app.post("/api/conta/sair")
@@ -178,29 +187,29 @@ async def logout(request: Request,response: Response):
     return {"ok":True}
 
 
-@app.put("/api/perfil", dependencies=[Depends(exigir_sessao)])
-async def atualizar_perfil(dados: PerfilNovo,response: Response):
+@app.put("/api/perfil")
+async def atualizar_perfil(dados: PerfilNovo, response: Response, conta_id: int = Depends(exigir_sessao)):
     if not dados.nome.strip():
         raise HTTPException(422,"Informe seu nome.")
     if dados.nova_senha:
         if len(dados.nova_senha)<8:
             raise HTTPException(422,"A nova senha precisa ter pelo menos 8 caracteres.")
-        if not db.conferir(dados.senha_atual):
+        if not db.conferir(dados.senha_atual, conta_id):
             raise HTTPException(403,"A senha atual está incorreta.")
-    db.alterar(dados.nome.strip(),dados.nova_senha or None)
+    db.alterar(dados.nome.strip(),dados.nova_senha or None, conta_id)
     if dados.nova_senha:
-        cookie(response,db.sessao_nova())
-    return db.perfil()
+        cookie(response,db.sessao_nova(conta_id))
+    return db.perfil(conta_id)
 
 
-@app.get("/api/conversas", dependencies=[Depends(exigir_sessao)])
-async def conversas():
-    return db.listar_conversas()
+@app.get("/api/conversas")
+async def conversas(conta_id: int = Depends(exigir_sessao)):
+    return db.listar_conversas(conta_id)
 
 
-@app.get("/api/conversas/{identificador}", dependencies=[Depends(exigir_sessao)])
-async def conversa_salva(identificador: str):
-    conversa=db.ler_conversa(identificador)
+@app.get("/api/conversas/{identificador}")
+async def conversa_salva(identificador: str, conta_id: int = Depends(exigir_sessao)):
+    conversa=db.ler_conversa(identificador, conta_id)
     if conversa is None:
         raise HTTPException(404,"Conversa não encontrada.")
     return conversa

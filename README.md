@@ -226,7 +226,11 @@ Para abrir novamente, inicie o backend e depois execute `npm run dev` na pasta `
 
 ## Conta, perfil e dados locais
 
-Uma conta pessoal por instalação. Clique no perfil, no rodapé da barra lateral, para alterar nome ou senha; em telas pequenas, use a engrenagem no cabeçalho. Alterar a senha exige a senha atual e encerra as outras sessões.
+Para criar outra conta, saia do perfil e clique em **Cadastrar nova conta** na tela de login. Escolha um usuário único e uma senha de 8 a 128 caracteres. Cada conta tem suas próprias conversas.
+
+Se você já tinha conta antes da atualização, entre com o nome que constava no seu perfil e a senha existente. O banco é atualizado automaticamente e mantém as conversas na conta original.
+
+Clique no perfil para consultar seu usuário de acesso, alterar o nome de exibição ou trocar a senha. A troca de senha exige a senha atual e encerra as outras sessões dessa conta. O nome de exibição pode mudar sem alterar o usuário usado no login.
 
 O SQLite em `.data/agente.db` guarda o perfil, o hash scrypt da senha, sessões e conversas. `.data/` e `.env` são ignorados pelo Git e não são transferidos com `git clone` ou `git pull`.
 

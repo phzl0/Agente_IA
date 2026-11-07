@@ -12,7 +12,7 @@ class APIWeb(unittest.TestCase):
         self.pasta = tempfile.TemporaryDirectory()
         self.patch_banco = patch.object(db, 'BANCO', Path(self.pasta.name) / 'teste.db')
         self.patch_banco.start()
-        app.dependency_overrides[exigir_sessao] = lambda: None
+        app.dependency_overrides[exigir_sessao] = lambda: 1
         self.cliente = TestClient(app)
 
     def tearDown(self):
